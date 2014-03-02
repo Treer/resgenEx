@@ -6,6 +6,7 @@ namespace resgenEx
     using System.Resources;
     using System.Reflection;
     using System.Runtime.Serialization;
+    using System.Text.RegularExpressions;
 
     class ResourceItem : ISerializable
     {
@@ -16,6 +17,7 @@ namespace resgenEx
         string _metadata_originalSource;
         string _metadata_originalValue;
         
+        TranslationFlags _metadata_flags;
         /*
         string _po_translator_comments;
         string _po_extracted_comments;
@@ -34,6 +36,10 @@ namespace resgenEx
         public string Metadata_OriginalSource { get { return _metadata_originalSource; } }
         public string Metadata_OriginalValue  { get { return _metadata_originalValue; } }
 
+        public TranslationFlags Metadata_Flags {
+            get { return _metadata_flags; }
+            set { _metadata_flags = value; }
+        }
 
         #region ISerializable Members
 
@@ -104,6 +110,8 @@ namespace resgenEx
             }
         }
 
+        static Regex csharpFormat = new Regex(@"(^|[^\{])\{\d\}"); // matches "{0}" unless the first bracket is escaped, e.g. "{{0}"
+
         public ResourceItem(ResXDataNode data)
         {
             if (data == null) throw new ArgumentNullException();
@@ -112,6 +120,11 @@ namespace resgenEx
                 _name = data.Name;
                 _value = data.GetValue(_assemblyname) as String;
                 _metadata_comment = data.Comment;
+
+                if (!String.IsNullOrEmpty(Value)) {
+                    // Since this is being read from .resx, assume it's a .Net/C# style string
+                    if (csharpFormat.IsMatch(Value)) _metadata_flags |= TranslationFlags.csharpFormatString;
+                }
             }
         }
     }

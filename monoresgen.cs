@@ -72,7 +72,7 @@ Usage:
             Usage += @"
 
 Convert a resource file from one format to another.
-The currently supported formats are: '.resx' '.po'.
+The currently supported formats are: '.resx' '.po' '.pot'.
 If the destination file is not specified, source.resources will be used.";
 
             Usage += @"

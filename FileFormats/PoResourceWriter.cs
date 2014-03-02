@@ -165,6 +165,10 @@ namespace resgenEx.FileFormats
                         // string is used in, currently PoResourceWriter just inserts the source file name though.
                         s.WriteLine("#: {0}", EscapeComment(sourceReference, '.'));
                     }
+
+                    if ((item.Metadata_Flags & TranslationFlags.csharpFormatString) != 0) {
+                        s.WriteLine("#, csharp-format");                        
+                    }
                 }
             }
 

@@ -1,4 +1,7 @@
-﻿namespace resgenEx
+﻿// This file is GPL
+//
+// It is modified from files obtained from the mono project under GPL licence.
+namespace resgenEx
 {
     public enum CommentOptions
     {
@@ -14,7 +17,7 @@
         /// </summary>
         writeSourceCommentsOnly,
         /// <summary>
-        /// don't export the comment from the source file to the destination 
+        /// don't export the rawComments from the source file to the destination 
         /// format, and don't include automatically created comments.
         /// </summary>
         writeNoComments

@@ -1,7 +1,11 @@
-﻿namespace resgenEx.FileFormats
+﻿// This file is GPL
+//
+// It is modified from files obtained from the mono project under GPL licence.
+namespace resgenEx.FileFormats
 {
     using System;
     using System.Collections;
+    using System.Collections.Generic;
     using System.IO;
     using System.Reflection;
     using System.Resources;
@@ -9,14 +13,16 @@
 
     class PoResourceReader : IResourceReader
     {
-        Hashtable data;
+        Dictionary<string, PoItem> data;
+        //Directory<DictionaryEntry> data;
+
         Stream s;
         CommentOptions commentOptions;
         int line_num;
 
         public PoResourceReader(Stream stream, CommentOptions aCommentOptions)
         {
-            data = new Hashtable();
+            data = new Dictionary<string, PoItem>();
             s = stream;
             commentOptions = aCommentOptions;
             Load();
@@ -29,8 +35,55 @@
 
         public IDictionaryEnumerator GetEnumerator()
         {
-            return data.GetEnumerator();
+            return (data as IDictionary).GetEnumerator();
         }
+
+        string Unescape(string unescapedCString)
+        {
+            StringBuilder result = new StringBuilder();
+
+            // System.Text.RegularExpressions.Regex.Unescape(result) would unescape many chars that
+            // .po files don't escape (it escapes \, *, +, ?, |, {, [, (,), ^, $,., #, and white space), so I'm
+            // doing it manually.
+
+            char lastChar = '\0';
+            bool escapeCompleted = false;
+            for (int i = 0; i < unescapedCString.Length; i++) {
+
+                char currentChar = unescapedCString[i];
+
+                if (lastChar == '\\') {
+
+                    escapeCompleted = true;
+
+                    switch (currentChar) {
+                        case '\\': result.Append("\\"); break;
+                        case '"': result.Append("\""); break;
+                        case 'r': result.Append("\r"); break;
+                        case 'n': result.Append("\n"); break;
+                        case 't': result.Append("\t"); break;
+                        default:
+                            escapeCompleted = false;
+
+                            result.Append(lastChar);
+                            result.Append(currentChar);                            
+                            break;
+                    }
+                } else if (currentChar != '\\') {
+                    result.Append(currentChar);
+                }
+
+                if (escapeCompleted) {
+                    lastChar = '\0';
+                    escapeCompleted = false;
+                } else {
+                    lastChar = currentChar;
+                }
+            }
+
+            return result.ToString();
+        }
+
 
         string GetValue(string line)
         {
@@ -42,21 +95,21 @@
             if (end == -1)
                 throw new FormatException(String.Format("No closing quote at line {0}: {1}", line_num, line));
 
-            return line.Substring(begin + 1, end - begin - 1);
+            return Unescape(line.Substring(begin + 1, end - begin - 1));
         }
 
-        void AddData(string msgid, string msgstr, string comment, int sourceLineNumber)
+        void AddData(string msgid, string msgstr, string rawComments, bool fuzzy, int sourceLineNumber)
         {
             if (String.IsNullOrEmpty(msgid)) {
                 Console.WriteLine("Error: Found empty msgid - will skip it. Line: " + sourceLineNumber);
             } else {
-                if (String.IsNullOrEmpty(comment)) {
-                    data.Add(msgid, msgstr);
-                } else {
-                    ResXDataNode dataNode = new ResXDataNode(msgid, msgstr);
-                    dataNode.Comment = comment;
-                    data.Add(msgid, dataNode);
-                }
+                //if (String.IsNullOrEmpty(rawComments) && !fuzzy) {
+                //    // there's nothing .po format specific to this item, just store it as a key/value string
+                //    data.Add(msgid, msgstr);
+                //} else {
+                    PoItem item = new PoItem(msgid, msgstr, rawComments, fuzzy);
+                    data.Add(msgid, item);
+                //}
             }
         }
 
@@ -64,66 +117,32 @@
         {
             StreamReader reader = new StreamReader(s);
             string line;
+
             string msgid = null;
             string msgstr = null;
-            string comment = null;
-            bool ignoreNext = false;
-            bool ignoreNextExtractedComment = false;
+            string rawComment = null;
+            string rawCommentAccumulator = String.Empty;
+            bool fuzzy = false;
 
             while ((line = reader.ReadLine()) != null) {
                 line_num++;
                 line = line.Trim();
+                
+
                 if (line.Length == 0) {
-                    comment = null;
+                    if (!String.IsNullOrEmpty(rawCommentAccumulator)) {
+                        // include blank lines if a comment was started
+                        rawCommentAccumulator += line + "\n";
+                    }
                     continue;
                 }
 
                 if (line[0] == '#') {
+                    rawCommentAccumulator += line + "\n";
 
-                    if (line.Length > 1 && line[1] == '.') {
-
-                        if (!ignoreNextExtractedComment) {
-
-                            // It's an extracted comment
-                            if (line.StartsWith(ResGen.cOriginalMessageComment_Prefix)) {
-                                // It's one of our auto generated comments
-                                /* There's no place in .resx files for these, ignore it.
-                                if (commentOptions == CommentOptions.writeFullComments) {
-                                    comment = (comment == null ? String.Empty : comment + "\n");
-                                    comment += line.Substring(ResGen.cOriginalMessageComment_Prefix.Length);
-                                }*/
-                                // The presence of an auto generated comment probably means there was a blank line added to the end of the comment.
-                                if (comment != null && comment.Length > 0 && (comment[comment.Length - 1] == '\n')) {
-                                    comment = comment.Substring(0, comment.Length - 1);
-                                }
-                                ignoreNextExtractedComment = true; // it might be a multiline autogenerated comment, so ignore any #. comments from now on
-
-                            } else {
-                                // It's a normal extracted comment
-                                if (commentOptions != CommentOptions.writeNoComments) {
-                                    comment = (comment == null ? String.Empty : comment + "\n");
-                                    comment += line.Substring(2).TrimStart();
-                                }
-                            }
-                        }
-                    }
-
-
-                    if (line.Length == 1 || line[1] != ',')
-                        continue;
-
-                    if (line.IndexOf("fuzzy") != -1) {
-                        ignoreNext = true;
-                        if (msgid != null) {
-                            if (msgstr == null)
-                                throw new FormatException("Error. Line: " + line_num);
-
-                            AddData(msgid, msgstr, comment, line_num);
-                            msgid = null;
-                            msgstr = null;
-                            comment = null;
-                            ignoreNextExtractedComment = false;
-                        }
+                    if (line.Length > 1 && line[1] == ',') {
+                        // it's a flag rawComments
+                        if (line.IndexOf("fuzzy") != -1) fuzzy = true;
                     }
                     continue;
                 }
@@ -132,18 +151,17 @@
                     if (msgid == null && msgstr != null)
                         throw new FormatException("Found 2 consecutive msgid. Line: " + line_num);
 
-                    if (msgstr != null) {
-                        if (!ignoreNext)
-                            AddData(msgid, msgstr, comment, line_num);
-
-                        ignoreNext = false;
-                        msgid = null;
-                        msgstr = null;
-                        comment = null;
-                        ignoreNextExtractedComment = false;
+                    // A new msgid has been encountered, so commit the last one
+                    if (msgid != null && msgstr != null) {
+                        AddData(msgid, msgstr, rawComment, fuzzy, line_num);
                     }
 
                     msgid = GetValue(line);
+                    msgstr = null;
+                    rawComment = rawCommentAccumulator;
+                    rawCommentAccumulator = String.Empty;
+                    fuzzy = false;
+
                     continue;
                 }
 
@@ -156,10 +174,14 @@
                 }
 
                 if (line[0] == '"') {
-                    if (msgid == null || msgstr == null)
+                    if (msgid == null && msgstr == null)
                         throw new FormatException("Invalid format. Line: " + line_num);
 
-                    msgstr += GetValue(line);
+                    if (msgstr == null) {
+                        msgid += GetValue(line).Replace("\\r", "\r").Replace("\\n", "\n");
+                    } else {
+                        msgstr += GetValue(line);
+                    }
                     continue;
                 }
 
@@ -170,9 +192,7 @@
                 if (msgstr == null)
                     throw new FormatException("Expecting msgstr. Line: " + line_num);
 
-                if (!ignoreNext) {
-                    AddData(msgid, msgstr, comment, line_num);
-                }
+                AddData(msgid, msgstr, rawComment, fuzzy, line_num);
             }
         }
 

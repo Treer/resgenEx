@@ -79,7 +79,7 @@ If the destination file is not specified, source.resources will be used.";
 
 Options:
 -nocomments, /noComments
-    don't export the comment from the source file to the destination 
+    don't export the rawComments from the source file to the destination 
     format, and don't include automatically created comments.
 -sourcecommentsonly, /sourceCommentsOnly
     only export comments to the destination format that existed in the
@@ -167,10 +167,18 @@ Options:
                 foreach (DictionaryEntry e in reader) {
                     rescount++;
                     object val = e.Value;
-                    if (val is string)
+                    if (val is string) {
                         writer.AddResource((string)e.Key, (string)e.Value);
-                    else
-                        writer.AddResource((string)e.Key, e.Value);
+                    } else {
+                        // refactoring to do: We should probably wrap the ResXResourceWriter, and replace our use of IResourceWriter with a ResourceItem based interface
+                        if (writer is ResXResourceWriter && val is ResourceItem) {
+                            // only write if the ResourceItem can be cast to ResXDataNode
+                            ResXDataNode dataNode = ((ResourceItem)val).ToResXDataNode();
+                            if (dataNode != null) writer.AddResource((string)e.Key, dataNode);
+                        } else {
+                            writer.AddResource((string)e.Key, e.Value);
+                        }
+                    }
                 }
                 Console.WriteLine("Read in {0} resources from '{1}'", rescount, sname);
 
@@ -266,7 +274,7 @@ Options:
 
                     case "/nocomments":
                     case "-nocomments":
-                        // don't export the comment from the source file to the destination 
+                        // don't export the rawComments from the source file to the destination 
                         // format, and don't include automatically created comments.
 
                         if (commentOptions == CommentOptions.writeSourceCommentsOnly) {

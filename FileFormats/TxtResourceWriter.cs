@@ -1,4 +1,7 @@
-﻿namespace resgenEx.FileFormats
+﻿// This file is GPL
+//
+// It is modified from files obtained from the mono project under GPL licence.
+namespace resgenEx.FileFormats
 {
     using System;
     using System.Collections;

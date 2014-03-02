@@ -1,3 +1,5 @@
+// This file was obtained under a MIT X11 licence from the mono project - Treer
+
 /*
  * resgen: convert between the resource formats (.txt, .resources, .resx).
  *
@@ -17,11 +19,41 @@ using System.Resources;
 using System.Reflection;
 using System.Xml;
 
+// We don't need to keep mono compatibility, so I'm referencing Windows.Forms directly
+// to save having to do everything through reflection. - Treer
+using System.Windows.Forms;
+
+enum CommentOptions
+{
+    /// <summary>
+    /// Export comments to the destination format that existed in the
+    /// source file, and feel free to include any comments you can 
+    /// automatically generate.
+    /// </summary>
+    writeFullComments,
+    /// <summary>
+    /// only export comments to the destination format that existed in the
+    /// source file. Do not include automatically created comments.
+    /// </summary>
+    writeSourceCommentsOnly,
+    /// <summary>
+    /// don't export the comment from the source file to the destination 
+    /// format, and don't include automatically created comments.
+    /// </summary>
+    writeNoComments
+}
+
 class ResGen {
+    
 
 	static Assembly swf;
 	static Type resxr;
 	static Type resxw;
+
+    internal const string cProgramVersion = "v0.11";
+    internal const string cProgramNameShort = "resgenEx";
+    internal const string cProgramNameFull = "Extended Mono Resource Generator";
+    internal const string cOriginalMessageComment_Prefix = "#. Original message text: ";
 
 	/*
 	 * We load the ResX format stuff on demand, since the classes are in 
@@ -41,42 +73,49 @@ class ResGen {
 
 	static void Usage () {
 
-		string Usage = @"Mono Resource Generator version " + Consts.MonoVersion +
-		    @"
+		string Usage = cProgramNameFull + " " + cProgramVersion + //@"Mono Resource Generator version " + Consts.MonoVersion +
+            @"
+WARNING: this version has been specialized for use converting between '.resx'
+and '.po' files, other formats will now fail!
+
 Usage:
-		resgen source.ext [dest.ext]
-		resgen [options] /compile source.ext[,dest.resources] [...]";
+		resgen [options] source.ext [dest.ext]";
 		Usage += @"
 
 Convert a resource file from one format to another.
-The currently supported formats are: '.txt' '.resources' '.resx' '.po'.
+The currently supported formats are: '.resx' '.po'.
 If the destination file is not specified, source.resources will be used.";
 
 		Usage += @"
 
 Options:
--compile, /compile
-	takes a list of .resX or .txt files to convert to .resources files
-	in one bulk operation, replacing .ext with .resources for the 
-	output file name (if not set).
+-nocomments, /noComments
+    don't export the comment from the source file to the destination 
+    format, and don't include automatically created comments.
+-sourcecommentsonly, /sourceCommentsOnly
+    only export comments to the destination format that existed in the
+    source file. Do not include automatically created comments.
 -usesourcepath, /useSourcePath
 	to resolve relative file paths, use the directory of the resource 
-	file as current directory.";
+	file as current directory.
+    ";
 		Usage += @"
 ";
 		Console.WriteLine( Usage );
 	}
 	
-	static IResourceReader GetReader (Stream stream, string name, bool useSourcePath) {
+	static IResourceReader GetReader (Stream stream, string name, bool useSourcePath, CommentOptions commentOptions) {
 		string format = Path.GetExtension (name);
 		switch (format.ToLower (System.Globalization.CultureInfo.InvariantCulture)) {
 		case ".po":
-			return new PoResourceReader (stream);
+                return new PoResourceReader(stream, commentOptions);
+        /* this version has been specialized for use converting between '.resx' 
+         * and '.po' files, other formats will now fail!
 		case ".txt":
 		case ".text":
 			return new TxtResourceReader (stream);
 		case ".resources":
-			return new ResourceReader (stream);
+			return new ResourceReader (stream);*/
 		case ".resx":
 			LoadResX ();
 			IResourceReader reader = (IResourceReader) Activator.CreateInstance (
@@ -88,22 +127,29 @@ Options:
 					p.SetValue (reader, Path.GetDirectoryName (name), null);
 				}
 			}
+            ((ResXResourceReader)reader).UseResXDataNodes = true;
 			return reader;
 		default:
 			throw new Exception ("Unknown format in file " + name);
 		}
 	}
 	
-	static IResourceWriter GetWriter (Stream stream, string name) {
+    /// <param name="sourceFile">Optional - allows us to add metadata in the destination header about where the generated file originated from</param>
+	static IResourceWriter GetWriter (Stream stream, string name, CommentOptions commentOptions, string sourceFile) {
 		string format = Path.GetExtension (name);
+        string sourceResource = sourceFile ?? String.Empty;
+        sourceResource = "\\" + sourceResource.Substring(Path.GetPathRoot(sourceResource).Length); // remove the drive name from the path, as it's computer specific
+
 		switch (format.ToLower ()) {
 		case ".po":
-			return new PoResourceWriter (stream);
+                return new PoResourceWriter(stream, commentOptions, sourceResource);
+        /* this version has been specialized for use converting between '.resx' 
+         * and '.po' files, other formats will now fail!
 		case ".txt":
 		case ".text":
 			return new TxtResourceWriter (stream);
 		case ".resources":
-			return new ResourceWriter (stream);
+			return new ResourceWriter (stream);*/
 		case ".resx":
 			LoadResX ();
 			return (IResourceWriter)Activator.CreateInstance (resxw, new object[] {stream});
@@ -112,7 +158,7 @@ Options:
 		}
 	}
 	
-	static int CompileResourceFile (string sname, string dname, bool useSourcePath) {
+	static int CompileResourceFile (string sname, string dname, bool useSourcePath, CommentOptions commentOptions) {
 		FileStream source = null;
 		FileStream dest = null;
 		IResourceReader reader = null;
@@ -120,12 +166,12 @@ Options:
 
 		try {
 			source = new FileStream (sname, FileMode.Open, FileAccess.Read);
-			reader = GetReader (source, sname, useSourcePath);
+            reader = GetReader(source, sname, useSourcePath, commentOptions);
 
 			dest = new FileStream (dname, FileMode.Create, FileAccess.Write);
-			writer = GetWriter (dest, dname);
+            writer = GetWriter(dest, dname, commentOptions, sname);
 
-			int rescount = 0;
+			int rescount = 0;            
 			foreach (DictionaryEntry e in reader) {
 				rescount++;
 				object val = e.Value;
@@ -182,6 +228,7 @@ Options:
 		bool compileMultiple = false;
 		bool useSourcePath = false;
 		ArrayList inputFiles = new ArrayList ();
+        CommentOptions commentOptions = CommentOptions.writeFullComments;
 
 		for (int i = 0; i < args.Length; i++) {
 			switch (args [i].ToLower ()) {
@@ -191,8 +238,15 @@ Options:
 			case "/?":
 				Usage ();
 				return 1;
+            /* this version has been specialized for use converting between '.resx' 
+             * and '.po' files, other formats will now fail! /compile is only used
+             * for '.resources' files.
 			case "/compile":
 			case "-compile":
+                // takes a list of .resX or .txt files to convert to .resources files
+	            // in one bulk operation, replacing .ext with .resources for the 
+	            // output file name (if not set).
+
 				if (inputFiles.Count > 0) {
 					// the /compile option should be specified before any files
 					Usage ();
@@ -200,9 +254,12 @@ Options:
 				}
 				compileMultiple = true;
 				break;
-
+            */
 			case "/usesourcepath":
 			case "-usesourcepath":
+                // to resolve relative file paths, use the directory of the resource 
+	            // file as current directory.
+
 				if (compileMultiple) {
 					// the /usesourcepath option should not appear after the
 					// /compile switch on the command-line
@@ -213,6 +270,34 @@ Options:
 				}
 				useSourcePath = true;
 				break;
+
+            case "/nocomments":
+            case "-nocomments":
+                // don't export the comment from the source file to the destination 
+                // format, and don't include automatically created comments.
+
+                if (commentOptions == CommentOptions.writeSourceCommentsOnly) {
+                    // the /nocomments option should not appear after the
+                    // /sourcecommentsonly switch on the command-line
+                    Console.WriteLine("ResGen : error RG0000: Invalid command line syntax.  Switch: \"/nocomments\" cannot be used with \"/sourcecommentsonly\"");
+                    return 1;
+                }
+                commentOptions = CommentOptions.writeNoComments;
+                break;
+
+            case "/sourcecommentsonly":
+            case "-sourcecommentsonly":
+                // only export comments to the destination format that existed in the
+                // source file. Do not include automatically created comments.
+
+                if (commentOptions == CommentOptions.writeNoComments) {
+                    // the /nocomments option should not appear after the
+                    // /sourcecommentsonly switch on the command-line
+                    Console.WriteLine("ResGen : error RG0000: Invalid command line syntax.  Switch: \"/nocomments\" cannot be used with \"/sourcecommentsonly\"");
+                    return 1;
+                }
+                commentOptions = CommentOptions.writeSourceCommentsOnly;
+                break;
 
 			default:
 				if (!IsFileArgument (args [i])) {
@@ -267,7 +352,7 @@ Options:
 		}
 
 		foreach (ResourceInfo res in inputFiles) {
-			int ret = CompileResourceFile (res.InputFile, res.OutputFile, useSourcePath);
+            int ret = CompileResourceFile(res.InputFile, res.OutputFile, useSourcePath, commentOptions);
 			if (ret != 0 )
 				return ret;
 		}
@@ -452,12 +537,14 @@ class TxtResourceReader : IResourceReader {
 class PoResourceReader : IResourceReader {
 	Hashtable data;
 	Stream s;
+    CommentOptions commentOptions;
 	int line_num;
 	
-	public PoResourceReader (Stream stream)
+	public PoResourceReader (Stream stream, CommentOptions aCommentOptions)
 	{
 		data = new Hashtable ();
 		s = stream;
+        commentOptions = aCommentOptions;
 		Load ();
 	}
 	
@@ -483,22 +570,71 @@ class PoResourceReader : IResourceReader {
 
 		return line.Substring (begin + 1, end - begin - 1);
 	}
-	
+
+    void AddData(string msgid, string msgstr, string comment, int sourceLineNumber)
+    {
+        if (String.IsNullOrEmpty(msgid)) {
+            Console.WriteLine("Error: Found empty msgid - will skip it. Line: " + sourceLineNumber);
+        } else {
+            if (String.IsNullOrEmpty(comment)) {
+                data.Add(msgid, msgstr);
+            } else {
+                ResXDataNode dataNode = new ResXDataNode(msgid, msgstr);
+                dataNode.Comment = comment;
+                data.Add(msgid, dataNode);
+            }
+        }
+    }
+
 	void Load ()
 	{
 		StreamReader reader = new StreamReader (s);
 		string line;
 		string msgid = null;
 		string msgstr = null;
+        string comment = null;
 		bool ignoreNext = false;
+        bool ignoreNextExtractedComment = false;
 
 		while ((line = reader.ReadLine ()) != null) {
 			line_num++;
 			line = line.Trim ();
-			if (line.Length == 0)
+			if (line.Length == 0) {
+                comment = null;
 				continue;
+            }
 				
 			if (line [0] == '#') {
+
+                if (line.Length > 1 && line[1] == '.') {
+
+                    if (!ignoreNextExtractedComment) {
+
+                        // It's an extracted comment
+                        if (line.StartsWith(ResGen.cOriginalMessageComment_Prefix)) {
+                            // It's one of our auto generated comments
+                            /* There's no place in .resx files for these, ignore it.
+                            if (commentOptions == CommentOptions.writeFullComments) {
+                                comment = (comment == null ? String.Empty : comment + "\n");
+                                comment += line.Substring(ResGen.cOriginalMessageComment_Prefix.Length);
+                            }*/
+                            // The presence of an auto generated comment probably means there was a blank line added to the end of the comment.
+                            if (comment != null && comment.Length > 0 && (comment[comment.Length - 1] == '\n')) {
+                                comment = comment.Substring(0, comment.Length - 1);
+                            }
+                            ignoreNextExtractedComment = true; // it might be a multiline autogenerated comment, so ignore any #. comments from now on
+
+                        } else {
+                            // It's a normal extracted comment
+                            if (commentOptions != CommentOptions.writeNoComments) {
+                                comment = (comment == null ? String.Empty : comment + "\n");
+                                comment += line.Substring(2).TrimStart();
+                            }
+                        }
+                    }
+                }
+
+
 				if (line.Length == 1 || line [1] != ',')
 					continue;
 
@@ -507,9 +643,12 @@ class PoResourceReader : IResourceReader {
 					if (msgid != null) {
 						if (msgstr == null)
 							throw new FormatException ("Error. Line: " + line_num);
-						data.Add (msgid, msgstr);
+
+                        AddData(msgid, msgstr, comment, line_num);
 						msgid = null;
 						msgstr = null;
+                        comment = null;
+                        ignoreNextExtractedComment = false;
 					}
 				}
 				continue;
@@ -521,11 +660,13 @@ class PoResourceReader : IResourceReader {
 
 				if (msgstr != null) {
 					if (!ignoreNext)
-						data.Add (msgid, msgstr);
+                        AddData(msgid, msgstr, comment, line_num);
 
 					ignoreNext = false;
 					msgid = null;
 					msgstr = null;
+                    comment = null;
+                    ignoreNextExtractedComment = false;
 				}
 
 				msgid = GetValue (line);
@@ -555,8 +696,9 @@ class PoResourceReader : IResourceReader {
 			if (msgstr == null)
 				throw new FormatException ("Expecting msgstr. Line: " + line_num);
 
-			if (!ignoreNext)
-				data.Add (msgid, msgstr);
+            if (!ignoreNext) {
+                AddData(msgid, msgstr, comment, line_num);
+            }
 		}
 	}
 	
@@ -580,13 +722,25 @@ class PoResourceReader : IResourceReader {
 class PoResourceWriter : IResourceWriter
 {
 	TextWriter s;
+    CommentOptions commentOptions;
 	bool headerWritten;
-	
-	public PoResourceWriter (Stream stream)
+    string sourceFile = null;
+
+    public PoResourceWriter(Stream stream, CommentOptions aCommentOptions) : this(stream, aCommentOptions, null) { }
+
+	public PoResourceWriter (Stream stream, CommentOptions aCommentOptions, string aSourceFile)
 	{
 		s = new StreamWriter (stream);
+        commentOptions = aCommentOptions;
+        sourceFile = aSourceFile;
 	}
-	
+
+    public string SourceFile
+    {
+        get { return sourceFile; }
+        set { sourceFile = value; }
+    }
+
 	public void AddResource (string name, byte [] value)
 	{
 		throw new InvalidOperationException ("Binary data not valid in a po resource file");
@@ -594,11 +748,19 @@ class PoResourceWriter : IResourceWriter
 	
 	public void AddResource (string name, object value)
 	{
-		if (value is string) {
-			AddResource (name, (string) value);
+        string comment = null;
+
+        ResXDataNode dataNode = value as ResXDataNode;
+        if (dataNode != null) {
+            comment = dataNode.Comment;
+            value = dataNode.GetValue(new AssemblyName[0]);
+        }
+        
+        if (value is string) {
+            AddResource(name, (string)value, comment, null);
 			return;
 		}
-		throw new InvalidOperationException ("Objects not valid in a po resource file");
+		throw new InvalidOperationException ("Objects not valid in a po resource file: " + (value == null ? "null" : value.ToString()));
 	}
 
 	StringBuilder ebuilder = new StringBuilder ();
@@ -606,6 +768,9 @@ class PoResourceWriter : IResourceWriter
 	public string Escape (string ns)
 	{
 		ebuilder.Length = 0;
+
+        // the empty string is used on the first line, to allow better alignment of the multi-line string to follow
+        if (ns.Contains("\n")) ebuilder.Append ("\"\r\n\"");
 
 		foreach (char c in ns){
 			switch (c){
@@ -618,7 +783,7 @@ class PoResourceWriter : IResourceWriter
 				ebuilder.Append ("\\a");
 				break;
 			case '\n':
-				ebuilder.Append ("\\n");
+				ebuilder.Append ("\\n\"\r\n\"");
 				break;
 			case '\r':
 				ebuilder.Append ("\\r");
@@ -630,33 +795,113 @@ class PoResourceWriter : IResourceWriter
 		}
 		return ebuilder.ToString ();
 	}
-	
+
+    /// <param name="commentType">
+    /// If the comment contains a new-line, this paramter will determine
+    /// which type of comment it will be continued as after the newline. 
+    /// '\0' for a translator-comment, '.' for an extracted comment, ':' for a reference etc
+    /// </param>
+    /// <param name="indent">
+    /// If the comment contains a new-line, this paramter will determine how many
+    /// spaces of indent will precede the comment when it continues after the newline. 
+    /// </param>
+    public string EscapeComment(string ns, char commentType, int indent)
+    {
+        string newlineReplacement = "\n#";
+        if (commentType != '\0') newlineReplacement += commentType;
+        if (indent > 0) newlineReplacement = newlineReplacement.PadRight(newlineReplacement.Length + indent, ' ');
+
+        return ns.Replace("\n", newlineReplacement);
+    }
+
+    /// <param name="commentType">
+    /// If the comment contains a new-line, this paramter will determine
+    /// which type of comment it will be continued as after the newline. 
+    /// '\0' for a translator-comment, '.' for an extracted comment, ':' for a reference etc
+    /// </param>
+    public string EscapeComment(string ns, char commentType)
+    {
+        return EscapeComment(ns, commentType, 0);
+    }
+
 	public void AddResource (string name, string value)
+    {
+        AddResource(name, value, null, null);
+    }
+	
+	public void AddResource (string name, string value, string comment, string sourceReference)
 	{
 		if (!headerWritten) {
 			headerWritten = true;
 			WriteHeader ();
 		}
-		
-		s.WriteLine ("msgid \"{0}\"", Escape (name));
+
+        if (commentOptions != CommentOptions.writeNoComments) {
+
+            // if FullComments is set, then store the original message in a comment
+            // so the file could be converted into a .pot file (.po template file)
+            // without losing information.
+            string originalMessage = null;
+            if (commentOptions == CommentOptions.writeFullComments) {
+                originalMessage = value;
+                if (String.IsNullOrEmpty(sourceReference)) sourceReference = SourceFile;
+            } else {
+                // Don't include automatically generated comments such as file reference
+                sourceReference = null; 
+            }
+
+            if (!String.IsNullOrEmpty(comment)) {
+                // "#." in a .po file indicates an extracted comment
+                s.WriteLine("#. {0}", EscapeComment(comment, '.'));
+                if (!String.IsNullOrEmpty(originalMessage)) s.WriteLine("#. "); // leave an empty line between this comment and when we list the originalMessage
+            }
+
+            if (!String.IsNullOrEmpty(originalMessage)) {
+                // "#." in a .po file indicates an extracted comment
+                if (originalMessage.Contains("\n")) {
+                    // Start multi-line messages indented on a new line, and have each new line in the message indented
+                    s.WriteLine(ResGen.cOriginalMessageComment_Prefix + "\n#.    " + EscapeComment(originalMessage, '.', 4));
+                } else {
+                    s.WriteLine(ResGen.cOriginalMessageComment_Prefix + EscapeComment(originalMessage, '.', 4));
+                }
+            }
+            
+            if (!String.IsNullOrEmpty(sourceReference)) {
+                // "#:" in a .po file indicates a code reference comment, such as the line of source code the 
+                // string is used in, currently PoResourceWriter just inserts the source file name though.
+                s.WriteLine("#: {0}", EscapeComment(sourceReference, '.'));
+            }
+        }
+
+        s.WriteLine("msgid \"{0}\"", Escape(name));
 		s.WriteLine ("msgstr \"{0}\"", Escape (value));
 		s.WriteLine ("");
 	}
 	
 	void WriteHeader ()
 	{
+        s.WriteLine("# This file was generated by " + ResGen.cProgramNameShort + " " + ResGen.cProgramVersion);
+        if (!String.IsNullOrEmpty(SourceFile)) {
+            s.WriteLine("#");
+            s.WriteLine("# Converted to PO from:");
+            s.WriteLine("#   " + sourceFile);
+        }
+        s.WriteLine("#");
+        s.WriteLine ("#, fuzzy"); // this flag will cause this header item to be ignored as a msgid when converted to .resx
 		s.WriteLine ("msgid \"\"");
 		s.WriteLine ("msgstr \"\"");
 		s.WriteLine ("\"MIME-Version: 1.0\\n\"");
 		s.WriteLine ("\"Content-Type: text/plain; charset=UTF-8\\n\"");
 		s.WriteLine ("\"Content-Transfer-Encoding: 8bit\\n\"");
-		s.WriteLine ("\"X-Generator: Mono resgen 0.1\\n\"");
+		s.WriteLine ("\"X-Generator: AdvaTel resgenEx 0.11\\n\"");
+        /* Use msginit (a gettext tool) to fill in the header, missing header values detailed below
 		s.WriteLine ("#\"Project-Id-Version: FILLME\\n\"");
 		s.WriteLine ("#\"POT-Creation-Date: yyyy-MM-dd HH:MM+zzzz\\n\"");
 		s.WriteLine ("#\"PO-Revision-Date: yyyy-MM-dd HH:MM+zzzz\\n\"");
 		s.WriteLine ("#\"Last-Translator: FILLME\\n\"");
 		s.WriteLine ("#\"Language-Team: FILLME\\n\"");
 		s.WriteLine ("#\"Report-Msgid-Bugs-To: \\n\"");
+         */ 
 		s.WriteLine ();
 	}
 

@@ -60,6 +60,12 @@ namespace resgenEx.FileFormats
             char lastChar = '\0';
 
             foreach (char c in ns) {
+
+                if (lastChar == '\r' && c != '\n') {
+                    // The \r wasn't part of a CRLF, so treat it as a newline
+                    ebuilder.Append("%n");
+                }
+
                 switch (c) {
                     case '0':
                     case '1':
@@ -77,8 +83,13 @@ namespace resgenEx.FileFormats
                     case '%':
                         // wait until the next char to decide what to do with this one
                         break;
-                    case '\n':
+                    case '\n':                   
                         ebuilder.Append("%n");
+                        break;
+                    case '\r':
+                        // wait until the next char to decide what to do with this one
+                        // (if the next char is a \n, then discard the \r as being a part 
+                        // of the \n)
                         break;
                     default:
                         if (lastChar == '%') ebuilder.Append("%%");

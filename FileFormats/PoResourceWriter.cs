@@ -13,7 +13,7 @@ using System.Security.Principal;
     class PoResourceWriter : IResourceWriter
     {
         TextWriter s;
-        CommentOptions commentOptions;
+        Options options;
         bool headerWritten;
         string sourceFile = null;
 
@@ -25,12 +25,12 @@ using System.Security.Principal;
             return false;
         }
 
-        public PoResourceWriter(Stream stream, CommentOptions aCommentOptions) : this(stream, aCommentOptions, null) { }
+        public PoResourceWriter(Stream stream, Options aOptions) : this(stream, aOptions, null) { }
 
-        public PoResourceWriter(Stream stream, CommentOptions aCommentOptions, string aSourceFile)
+        public PoResourceWriter(Stream stream, Options aOptions, string aSourceFile)
         {
             s = new StreamWriter(stream);
-            commentOptions = aCommentOptions;
+            options = aOptions;
             sourceFile = aSourceFile;
         }
 
@@ -124,7 +124,7 @@ using System.Security.Principal;
             }
 
 
-            if (commentOptions != CommentOptions.writeNoComments) {
+            if (options.Comments != CommentOptions.writeNoComments) {
 
                 if (item is PoItem) {
                     // We can preserve the comments exactly as they were
@@ -137,7 +137,7 @@ using System.Security.Principal;
                     string originalMessage = item.Metadata_OriginalValue;
                     string sourceReference = item.Metadata_OriginalSource;
 
-                    if (commentOptions == CommentOptions.writeFullComments) {
+                    if (options.Comments == CommentOptions.writeFullComments) {
                         if (String.IsNullOrEmpty(originalMessage)) originalMessage = item.Value;
                         if (String.IsNullOrEmpty(sourceReference)) sourceReference = SourceFile;
                     } else {
@@ -167,12 +167,9 @@ using System.Security.Principal;
                         s.WriteLine("#: {0}", EscapeComment(sourceReference, '.'));
                     }
 
-                    /* Commented out because csharp-format tells the tools to check that the msgid and msgstr 
-                     * contain the same number of format specifications, but we aren't keeping the english strings
-                     * in our msgids so this just creates a bunch of erroneous warnings.
-                    if ((item.Metadata_Flags & TranslationFlags.csharpFormatString) != 0) {
+                    if (options.FormatFlags && (item.Metadata_Flags & TranslationFlags.csharpFormatString) != 0) {
                         s.WriteLine("#, csharp-format");                        
-                    }*/
+                    }
                 }
             }
 
@@ -204,6 +201,8 @@ using System.Security.Principal;
 
             string usersIdentity = WindowsIdentity.GetCurrent().Name;
             if (String.IsNullOrEmpty(usersIdentity)) usersIdentity = "NAME";
+            int slashPos = usersIdentity.LastIndexOf('\\');
+            if (slashPos >= 0 && slashPos < usersIdentity.Length) usersIdentity = usersIdentity.Substring(slashPos + 1); // Drop the domain name from the user name, if it's present
             s.WriteLine("\"Last-Translator: " + Escape(usersIdentity) + " <EMAIL@ADDRESS>\\n\"");
 
             s.WriteLine("\"Language-Team: English\\n\"");

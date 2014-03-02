@@ -22,4 +22,22 @@ namespace resgenEx
         /// </summary>
         writeNoComments
     }
+
+    public struct Options
+    {
+        public CommentOptions Comments;
+
+        /// <summary>
+        /// Format flags like csharp-format tells the tools to check that the msgid and msgstr 
+        /// contain the same number of format specifications, but if your not using the english 
+        /// strings as msgids then this just creates a bunch of erroneous warnings.
+        /// </summary>
+        public bool FormatFlags;
+
+        public Options(CommentOptions aComments, bool aFormatFlags)
+        {
+            Comments = aComments;
+            FormatFlags = aFormatFlags;
+        }
+    }
 }

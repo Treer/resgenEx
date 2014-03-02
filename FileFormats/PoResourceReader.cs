@@ -17,14 +17,14 @@ namespace resgenEx.FileFormats
         //Directory<DictionaryEntry> data;
 
         Stream s;
-        CommentOptions commentOptions;
+        Options options;
         int line_num;
 
-        public PoResourceReader(Stream stream, CommentOptions aCommentOptions)
+        public PoResourceReader(Stream stream, Options aOptions)
         {
             data = new Dictionary<string, PoItem>();
             s = stream;
-            commentOptions = aCommentOptions;
+            options = aOptions;
             Load();
         }
 

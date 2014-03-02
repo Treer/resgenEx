@@ -46,8 +46,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CommentOptions.cs" />
     <Compile Include="Consts.cs" />
+    <Compile Include="FileFormats\islResourceReader.cs" />
     <Compile Include="FileFormats\PoItem.cs" />
     <Compile Include="FileFormats\PoResourceReader.cs" />
     <Compile Include="FileFormats\PoResourceWriter.cs" />
@@ -55,6 +55,7 @@
     <Compile Include="FileFormats\TxtResourceReader.cs" />
     <Compile Include="FileFormats\TxtResourceWriter.cs" />
     <Compile Include="monoresgen.cs" />
+    <Compile Include="Options.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ResourceInfo.cs" />
     <Compile Include="ResourceItem.cs" />

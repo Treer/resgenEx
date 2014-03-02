@@ -13,6 +13,6 @@
             return true;
         }
 
-        public PotResourceWriter(Stream stream, CommentOptions aCommentOptions, string aSourceFile) : base(stream, aCommentOptions, aSourceFile) { }
+        public PotResourceWriter(Stream stream, Options aOptions, string aSourceFile) : base(stream, aOptions, aSourceFile) { }
     }
 }

@@ -81,9 +81,15 @@ Options:
 -nocomments, /noComments
     don't export the rawComments from the source file to the destination 
     format, and don't include automatically created comments.
+
 -sourcecommentsonly, /sourceCommentsOnly
     only export comments to the destination format that existed in the
     source file. Do not include automatically created comments.
+
+-addformatflags, /addFormatFlags
+    when exporting to .po or .pot, flags such as csharp-format will 
+    be added to strings which contain format specifications, e.g. ""{0}""
+
 -usesourcepath, /useSourcePath
 	to resolve relative file paths, use the directory of the resource 
 	file as current directory.
@@ -93,13 +99,13 @@ Options:
             Console.WriteLine(Usage);
         }
 
-        static IResourceReader GetReader(Stream stream, string name, bool useSourcePath, CommentOptions commentOptions)
+        static IResourceReader GetReader(Stream stream, string name, bool useSourcePath, Options options)
         {
             string format = Path.GetExtension(name);
             switch (format.ToLower(System.Globalization.CultureInfo.InvariantCulture)) {
                 case ".po":
                 case ".pot":
-                    return new PoResourceReader(stream, commentOptions);
+                    return new PoResourceReader(stream, options);
                 /* this version has been specialized for use converting between '.resx' 
                  * and '.po' files, other formats will now fail!
                 case ".txt":
@@ -126,7 +132,7 @@ Options:
         }
 
         /// <param name="sourceFile">Optional - allows us to add metadata in the destination header about where the generated file originated from</param>
-        static IResourceWriter GetWriter(Stream stream, string name, CommentOptions commentOptions, string sourceFile)
+        static IResourceWriter GetWriter(Stream stream, string name, Options options, string sourceFile)
         {
             string format = Path.GetExtension(name);
             string sourceResource = sourceFile ?? String.Empty;
@@ -134,9 +140,9 @@ Options:
 
             switch (format.ToLower()) {
                 case ".po":
-                    return new PoResourceWriter(stream, commentOptions, sourceResource);
+                    return new PoResourceWriter(stream, options, sourceResource);
                 case ".pot":
-                    return new PotResourceWriter(stream, commentOptions, sourceResource);
+                    return new PotResourceWriter(stream, options, sourceResource);
                 /* this version has been specialized for use converting between '.resx' 
                  * and '.po' files, other formats will now fail!
                 case ".txt":
@@ -152,7 +158,7 @@ Options:
             }
         }
 
-        static int CompileResourceFile(string sname, string dname, bool useSourcePath, CommentOptions commentOptions)
+        static int CompileResourceFile(string sname, string dname, bool useSourcePath, Options options)
         {
             FileStream source = null;
             FileStream dest = null;
@@ -161,10 +167,10 @@ Options:
 
             try {
                 source = new FileStream(sname, FileMode.Open, FileAccess.Read);
-                reader = GetReader(source, sname, useSourcePath, commentOptions);
+                reader = GetReader(source, sname, useSourcePath, options);
 
                 dest = new FileStream(dname, FileMode.Create, FileAccess.Write);
-                writer = GetWriter(dest, dname, commentOptions, sname);
+                writer = GetWriter(dest, dname, options, sname);
 
                 int rescount = 0;
                 foreach (DictionaryEntry e in reader) {
@@ -232,7 +238,7 @@ Options:
             bool compileMultiple = false;
             bool useSourcePath = false;
             ArrayList inputFiles = new ArrayList();
-            CommentOptions commentOptions = CommentOptions.writeFullComments;
+            Options options = new Options(CommentOptions.writeFullComments, false);
 
             for (int i = 0; i < args.Length; i++) {
                 switch (args[i].ToLower()) {
@@ -280,13 +286,13 @@ Options:
                         // don't export the rawComments from the source file to the destination 
                         // format, and don't include automatically created comments.
 
-                        if (commentOptions == CommentOptions.writeSourceCommentsOnly) {
+                        if (options.Comments == CommentOptions.writeSourceCommentsOnly) {
                             // the /nocomments option should not appear after the
                             // /sourcecommentsonly switch on the command-line
                             Console.WriteLine("ResGen : error RG0000: Invalid command line syntax.  Switch: \"/nocomments\" cannot be used with \"/sourcecommentsonly\"");
                             return 1;
                         }
-                        commentOptions = CommentOptions.writeNoComments;
+                        options.Comments = CommentOptions.writeNoComments;
                         break;
 
                     case "/sourcecommentsonly":
@@ -294,13 +300,22 @@ Options:
                         // only export comments to the destination format that existed in the
                         // source file. Do not include automatically created comments.
 
-                        if (commentOptions == CommentOptions.writeNoComments) {
+                        if (options.Comments == CommentOptions.writeNoComments) {
                             // the /nocomments option should not appear after the
                             // /sourcecommentsonly switch on the command-line
                             Console.WriteLine("ResGen : error RG0000: Invalid command line syntax.  Switch: \"/nocomments\" cannot be used with \"/sourcecommentsonly\"");
                             return 1;
                         }
-                        commentOptions = CommentOptions.writeSourceCommentsOnly;
+                        options.Comments = CommentOptions.writeSourceCommentsOnly;
+                        break;
+
+                    case "/addformatflags":
+                    case "-addformatflags":
+                        // Format flags in a .po like csharp-format tells the tools to check that the msgid and msgstr 
+                        // contain the same number of format specifications, but if your not using the english 
+                        // strings as msgids then this just creates a bunch of erroneous warnings.
+
+                        options.FormatFlags = true;
                         break;
 
                     default:
@@ -356,7 +371,7 @@ Options:
             }
 
             foreach (ResourceInfo res in inputFiles) {
-                int ret = CompileResourceFile(res.InputFile, res.OutputFile, useSourcePath, commentOptions);
+                int ret = CompileResourceFile(res.InputFile, res.OutputFile, useSourcePath, options);
                 if (ret != 0)
                     return ret;
             }

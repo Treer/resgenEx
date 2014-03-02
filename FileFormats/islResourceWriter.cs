@@ -27,7 +27,21 @@ namespace resgenEx.FileFormats
 
         public IslResourceWriter(Stream stream, Options aOptions, string aSourceFile)
         {
-            s = new StreamWriter(stream, Encoding.UTF8);
+            // The unicode version of InnoSetup still requires that its .isl files be ANSI.
+            //
+            // To do: The resourceReader needs to be queried to determine (or guess) the
+            // appropriate codepage to use, encode the .isl in that format and include 
+            // a header to specify the code page:
+            // 
+            //   [LangOptions]
+            //   LanguageCodePage=<codepage>
+            //
+            // Command-line override of the output codepage should also be provided.
+            //
+            // For now we will use the default code page, as that is what our current .isl
+            // files were in.
+            s = new StreamWriter(stream, Encoding.Default);
+
             options = aOptions;
             sourceFile = aSourceFile;
         }

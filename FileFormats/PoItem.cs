@@ -48,7 +48,7 @@
                     }
                 }
             }
-            return result.ToString().TrimEnd();
+            return result.ToString().TrimEnd('\n', '\r');
         }
 
         public string Metadata_PoRawComments { get { return _metadata_po_rawComments; } }

@@ -98,6 +98,7 @@ Options:
             string format = Path.GetExtension(name);
             switch (format.ToLower(System.Globalization.CultureInfo.InvariantCulture)) {
                 case ".po":
+                case ".pot":
                     return new PoResourceReader(stream, commentOptions);
                 /* this version has been specialized for use converting between '.resx' 
                  * and '.po' files, other formats will now fail!
@@ -134,6 +135,8 @@ Options:
             switch (format.ToLower()) {
                 case ".po":
                     return new PoResourceWriter(stream, commentOptions, sourceResource);
+                case ".pot":
+                    return new PotResourceWriter(stream, commentOptions, sourceResource);
                 /* this version has been specialized for use converting between '.resx' 
                  * and '.po' files, other formats will now fail!
                 case ".txt":

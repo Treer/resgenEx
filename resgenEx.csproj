@@ -51,6 +51,7 @@
     <Compile Include="FileFormats\PoItem.cs" />
     <Compile Include="FileFormats\PoResourceReader.cs" />
     <Compile Include="FileFormats\PoResourceWriter.cs" />
+    <Compile Include="FileFormats\PotResourceWriter.cs" />
     <Compile Include="FileFormats\TxtResourceReader.cs" />
     <Compile Include="FileFormats\TxtResourceWriter.cs" />
     <Compile Include="monoresgen.cs" />

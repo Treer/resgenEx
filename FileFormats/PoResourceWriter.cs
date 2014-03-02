@@ -16,6 +16,14 @@ namespace resgenEx.FileFormats
         bool headerWritten;
         string sourceFile = null;
 
+        /// <summary>
+        /// Override this in subclass if you want to write a .pot file instead of a .po file
+        /// </summary>
+        protected virtual bool WriteValuesAsBlank()
+        {
+            return false;
+        }
+
         public PoResourceWriter(Stream stream, CommentOptions aCommentOptions) : this(stream, aCommentOptions, null) { }
 
         public PoResourceWriter(Stream stream, CommentOptions aCommentOptions, string aSourceFile)
@@ -107,7 +115,7 @@ namespace resgenEx.FileFormats
             AddResource(ResourceItem.Get(name, value));
         }
 
-        public void AddResource(ResourceItem item) // string name, string value, string rawComments, string sourceReference)
+        public virtual void AddResource(ResourceItem item) 
         {        
             if (!headerWritten) {
                 headerWritten = true;
@@ -160,8 +168,10 @@ namespace resgenEx.FileFormats
                 }
             }
 
+            string value = WriteValuesAsBlank() ? String.Empty : Escape(item.Value);
+
             s.WriteLine("msgid \"{0}\"", Escape(item.Name));
-            s.WriteLine("msgstr \"{0}\"", Escape(item.Value));
+            s.WriteLine("msgstr \"{0}\"", value);
             s.WriteLine("");
         }
 

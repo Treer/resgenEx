@@ -29,9 +29,21 @@ using System.Security.Principal;
 
         public PoResourceWriter(Stream stream, Options aOptions, string aSourceFile)
         {
-            s = new StreamWriter(stream);
+            // Unicode BOM causes syntax errors in the gettext utils
+            Encoding utf8WithoutBom = new UTF8Encoding(false);
+            s = new StreamWriter(stream, utf8WithoutBom);
+
             options = aOptions;
             sourceFile = aSourceFile;
+
+            // Even if the .po file we are writing contains no items, it still needs to contain
+            // the header, otherwise msgmerge will screw up when passed a 0 length file (I think
+            // it screws up because without the header it makes bad judgements about the character
+            // encoding it's supposed to be merging using).
+            if (!headerWritten) {
+                headerWritten = true;
+                WriteHeader();
+            }
         }
 
         public string SourceFile

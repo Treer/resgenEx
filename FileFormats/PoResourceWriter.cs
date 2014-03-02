@@ -8,6 +8,7 @@ namespace resgenEx.FileFormats
     using System.Reflection;
     using System.Resources;
     using System.Text;
+using System.Security.Principal;
 
     class PoResourceWriter : IResourceWriter
     {
@@ -166,9 +167,12 @@ namespace resgenEx.FileFormats
                         s.WriteLine("#: {0}", EscapeComment(sourceReference, '.'));
                     }
 
+                    /* Commented out because csharp-format tells the tools to check that the msgid and msgstr 
+                     * contain the same number of format specifications, but we aren't keeping the english strings
+                     * in our msgids so this just creates a bunch of erroneous warnings.
                     if ((item.Metadata_Flags & TranslationFlags.csharpFormatString) != 0) {
                         s.WriteLine("#, csharp-format");                        
-                    }
+                    }*/
                 }
             }
 
@@ -195,14 +199,18 @@ namespace resgenEx.FileFormats
             s.WriteLine("\"Content-Type: text/plain; charset=UTF-8\\n\"");
             s.WriteLine("\"Content-Transfer-Encoding: 8bit\\n\"");
             s.WriteLine("\"X-Generator: AdvaTel resgenEx 0.11\\n\"");
-            /* Use msginit (a gettext tool) to fill in the header, missing header values detailed below
-            s.WriteLine ("#\"Project-Id-Version: FILLME\\n\"");
-            s.WriteLine ("#\"POT-Creation-Date: yyyy-MM-dd HH:MM+zzzz\\n\"");
-            s.WriteLine ("#\"PO-Revision-Date: yyyy-MM-dd HH:MM+zzzz\\n\"");
-            s.WriteLine ("#\"Last-Translator: FILLME\\n\"");
-            s.WriteLine ("#\"Language-Team: FILLME\\n\"");
-            s.WriteLine ("#\"Report-Msgid-Bugs-To: \\n\"");
-             */
+            s.WriteLine("\"Project-Id-Version: PACKAGE VERSION\\n\"");
+            s.WriteLine("\"PO-Revision-Date: " + DateTime.Now.ToString("yyyy-MM-dd HH:MMzzzz") + "\\n\"");
+
+            string usersIdentity = WindowsIdentity.GetCurrent().Name;
+            if (String.IsNullOrEmpty(usersIdentity)) usersIdentity = "NAME";
+            s.WriteLine("\"Last-Translator: " + Escape(usersIdentity) + " <EMAIL@ADDRESS>\\n\"");
+
+            s.WriteLine("\"Language-Team: English\\n\"");
+            s.WriteLine("\"Report-Msgid-Bugs-To: \\n\"");
+            s.WriteLine("\"Plural-Forms: nplurals=2; plural=(n != 1);\\n\"");
+            
+
             s.WriteLine();
         }
 

@@ -65,14 +65,14 @@ namespace resgenEx
             string Usage = cProgramNameFull + " " + cProgramVersion + //@"Mono Resource Generator version " + Consts.MonoVersion +
                 @"
 WARNING: this version has been specialized for use converting between '.resx'
-and '.po' files, other formats will now fail!
+, '.po', and '.isl' files, other formats will now fail!
 
 Usage:
 		resgen [options] source.ext [dest.ext]";
             Usage += @"
 
 Convert a resource file from one format to another.
-The currently supported formats are: '.resx' '.po' '.pot'.
+The currently supported formats are: '.resx' '.po' '.pot' '.isl'.
 If the destination file is not specified, source.resources will be used.";
 
             Usage += @"
@@ -106,6 +106,8 @@ Options:
                 case ".po":
                 case ".pot":
                     return new PoResourceReader(stream, options);
+                case ".isl":
+                    return new IslResourceReader(stream, options);
                 /* this version has been specialized for use converting between '.resx' 
                  * and '.po' files, other formats will now fail!
                 case ".txt":
@@ -139,6 +141,8 @@ Options:
             sourceResource = "\\" + sourceResource.Substring(Path.GetPathRoot(sourceResource).Length); // remove the drive name from the path, as it's computer specific
 
             switch (format.ToLower()) {
+                case ".isl":
+                    return new IslResourceWriter(stream, options, sourceResource);
                 case ".po":
                     return new PoResourceWriter(stream, options, sourceResource);
                 case ".pot":
@@ -180,13 +184,23 @@ Options:
                         writer.AddResource((string)e.Key, (string)e.Value);
                     } else {
                         // refactoring to do: We should probably wrap the ResXResourceWriter, and replace our use of IResourceWriter with a ResourceItem based interface
-                        if (writer is ResXResourceWriter && val is ResourceItem) {
-                            // only write if the ResourceItem can be cast to ResXDataNode
-                            ResXDataNode dataNode = ((ResourceItem)val).ToResXDataNode();
-                            if (dataNode != null) writer.AddResource((string)e.Key, dataNode);
-                        } else {
-                            writer.AddResource((string)e.Key, e.Value);
+                        ResourceItem item = val as ResourceItem;
+                        try {
+                            if (writer is ResXResourceWriter && item != null) {
+                                // only write if the ResourceItem can be cast to ResXDataNode
+                                ResXDataNode dataNode = ((ResourceItem)val).ToResXDataNode();
+                                if (dataNode != null) writer.AddResource((string)e.Key, dataNode);
+                                
+                            } else {
+                                writer.AddResource((string)e.Key, e.Value);
+                            }
+                        } catch {
+                            if (item != null && item.Metadata_OriginalSourceLine > 0) {
+                                Console.WriteLine("Line: {0}", item.Metadata_OriginalSourceLine);
+                            }
+                            throw;
                         }
+
                     }
                 }
                 Console.WriteLine("Read in {0} resources from '{1}'", rescount, sname);

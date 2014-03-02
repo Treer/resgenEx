@@ -14,8 +14,9 @@ namespace resgenEx
         string _value;
 
         string _metadata_comment;
-        string _metadata_originalSource;
         string _metadata_originalValue;
+        string _metadata_originalSource;
+        int _metadata_originalSourceLine;
         
         TranslationFlags _metadata_flags;
         /*
@@ -33,8 +34,13 @@ namespace resgenEx
         public string Value { get { return _value; } }
 
         public string Metadata_Comment        { get { return _metadata_comment; } }
-        public string Metadata_OriginalSource { get { return _metadata_originalSource; } }
         public string Metadata_OriginalValue  { get { return _metadata_originalValue; } }
+        public string Metadata_OriginalSource { get { return _metadata_originalSource; } }
+        public int Metadata_OriginalSourceLine { 
+            get { return _metadata_originalSourceLine; }
+            set { _metadata_originalSourceLine = value; }
+        }
+
 
         public TranslationFlags Metadata_Flags {
             get { return _metadata_flags; }

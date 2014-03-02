@@ -11,18 +11,17 @@ namespace resgenEx.FileFormats
     using System.Resources;
     using System.Text;
 
-    class PoResourceReader : IResourceReader
+    class IslResourceReader : IResourceReader
     {
-        Dictionary<string, PoItem> data;
-        //Directory<DictionaryEntry> data;
+        Dictionary<string, ResourceItem> data;
 
         Stream s;
         Options options;
         int line_num;
 
-        public PoResourceReader(Stream stream, Options aOptions)
+        public IslResourceReader(Stream stream, Options aOptions)
         {
-            data = new Dictionary<string, PoItem>();
+            data = new Dictionary<string, ResourceItem>();
             s = stream;
             options = aOptions;
             Load();
@@ -52,16 +51,13 @@ namespace resgenEx.FileFormats
 
                 char currentChar = unescapedCString[i];
 
-                if (lastChar == '\\') {
+                if (lastChar == '%') {
 
                     escapeCompleted = true;
 
                     switch (currentChar) {
-                        case '\\': result.Append("\\"); break;
-                        case '"': result.Append("\""); break;
-                        case 'r': result.Append("\r"); break;
+                        case '%': result.Append("%"); break;
                         case 'n': result.Append("\n"); break;
-                        case 't': result.Append("\t"); break;
                         default:
                             escapeCompleted = false;
 
@@ -69,7 +65,7 @@ namespace resgenEx.FileFormats
                             result.Append(currentChar);                            
                             break;
                     }
-                } else if (currentChar != '\\') {
+                } else if (currentChar != '%') {
                     result.Append(currentChar);
                 }
 
@@ -98,12 +94,12 @@ namespace resgenEx.FileFormats
             return Unescape(line.Substring(begin + 1, end - begin - 1));
         }
 
-        void AddData(string msgid, string msgstr, string rawComments, bool fuzzy, int sourceLineNumber)
+        void AddData(string msgid, string msgstr, string comment, int sourceLineNumber)
         {
             if (String.IsNullOrEmpty(msgid)) {
                 Console.WriteLine("Error: Found empty msgid - will skip it. Line: " + sourceLineNumber);
             } else {
-                PoItem item = new PoItem(msgid, msgstr, rawComments, fuzzy);
+                ResourceItem item = new ResourceItem(msgid, msgstr, comment);
                 item.Metadata_OriginalSourceLine = sourceLineNumber;
 
                 if (data.ContainsKey(msgid)) {
@@ -115,14 +111,14 @@ namespace resgenEx.FileFormats
 
         void Load()
         {
-            StreamReader reader = new StreamReader(s);
+            StreamReader reader = new StreamReader(s, Encoding.Default);
             string line;
 
-            string msgid = null;
-            string msgstr = null;
-            string rawComment = null;
-            string rawCommentAccumulator = String.Empty;
-            bool fuzzy = false;
+            //string msgid = null;
+            //string msgstr = null;
+            //string rawComment = null;
+            string commentAccumulator = String.Empty;
+            //bool fuzzy = false;
 
             while ((line = reader.ReadLine()) != null) {
                 line_num++;
@@ -130,69 +126,42 @@ namespace resgenEx.FileFormats
                 
 
                 if (line.Length == 0) {
-                    if (!String.IsNullOrEmpty(rawCommentAccumulator)) {
+                    // it's a blank line
+
+                    if (!String.IsNullOrEmpty(commentAccumulator)) {
                         // include blank lines if a comment was started
-                        rawCommentAccumulator += line + "\n";
-                    }
-                    continue;
-                }
-
-                if (line[0] == '#') {
-                    rawCommentAccumulator += line + "\n";
-
-                    if (line.Length > 1 && line[1] == ',') {
-                        // it's a flag rawComments
-                        if (line.IndexOf("fuzzy") != -1) fuzzy = true;
-                    }
-                    continue;
-                }
-
-                if (line.StartsWith("msgid ")) {
-                    if (msgid == null && msgstr != null)
-                        throw new FormatException("Found 2 consecutive msgid. Line: " + line_num);
-
-                    // A new msgid has been encountered, so commit the last one
-                    if (msgid != null && msgstr != null) {
-                        AddData(msgid, msgstr, rawComment, fuzzy, line_num);
+                        commentAccumulator += line + "\n";
                     }
 
-                    msgid = GetValue(line);
-                    msgstr = null;
-                    rawComment = rawCommentAccumulator;
-                    rawCommentAccumulator = String.Empty;
-                    fuzzy = false;
+                } else if (line[0] == ';') {
+                    // it's a comment
 
-                    continue;
-                }
-
-                if (line.StartsWith("msgstr ")) {
-                    if (msgid == null)
-                        throw new FormatException("msgstr with no msgid. Line: " + line_num);
-
-                    msgstr = GetValue(line);
-                    continue;
-                }
-
-                if (line[0] == '"') {
-                    if (msgid == null && msgstr == null)
-                        throw new FormatException("Invalid format. Line: " + line_num);
-
-                    if (msgstr == null) {
-                        msgid += GetValue(line).Replace("\\r", "\r").Replace("\\n", "\n");
+                    if (line.Length > 1 && line[1] == ' ') {
+                        commentAccumulator += line.Substring(2) + "\n";
                     } else {
-                        msgstr += GetValue(line);
+                        commentAccumulator += line.Substring(1) + "\n";
                     }
                     continue;
+
+                } else if (line[0] == '[') {
+                    // It's a new section, any comment lines we've accumulated are unlikely to
+                    // be intended for the next item
+
+                    commentAccumulator = String.Empty;
+
+                } else {
+                    int assignmentPos = line.IndexOf('=');
+                    if (assignmentPos > 0) {
+                        // it's a msgid and msgstr
+                        AddData(
+                            line.Substring(0, assignmentPos).Trim(),     //msgid
+                            Unescape(line.Substring(assignmentPos + 1)), // msgstr
+                            commentAccumulator,
+                            line_num
+                        );
+                        commentAccumulator = String.Empty;
+                    }
                 }
-
-                throw new FormatException("Unexpected data. Line: " + line_num);
-            }
-
-            if (msgid != null) {
-                if (msgstr == null)
-                    throw new FormatException("Expecting msgstr. Line: " + line_num);
-
-                AddData(msgid, msgstr, rawComment, fuzzy, line_num);
             }
         }
 

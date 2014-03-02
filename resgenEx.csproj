@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="Consts.cs" />
     <Compile Include="FileFormats\islResourceReader.cs" />
+    <Compile Include="FileFormats\islResourceWriter.cs" />
     <Compile Include="FileFormats\PoItem.cs" />
     <Compile Include="FileFormats\PoResourceReader.cs" />
     <Compile Include="FileFormats\PoResourceWriter.cs" />

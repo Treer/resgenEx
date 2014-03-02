@@ -140,6 +140,11 @@ using System.Security.Principal;
                     if (options.Comments == CommentOptions.writeFullComments) {
                         if (String.IsNullOrEmpty(originalMessage)) originalMessage = item.Value;
                         if (String.IsNullOrEmpty(sourceReference)) sourceReference = SourceFile;
+
+                        if (item.Metadata_OriginalSourceLine > 0) {
+                            if (!String.IsNullOrEmpty(sourceReference)) sourceReference += ", ";
+                            sourceReference += "line " + item.Metadata_OriginalSourceLine;
+                        }
                     } else {
                         // Don't include automatically generated comments such as file reference
                         sourceReference = null;

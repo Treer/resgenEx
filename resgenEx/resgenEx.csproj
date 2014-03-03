@@ -46,7 +46,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Consts.cs" />
     <Compile Include="FileFormats\EncoderUtils.cs" />
     <Compile Include="FileFormats\IResourceHeader.cs" />
     <Compile Include="FileFormats\islResourceReader.cs" />
@@ -57,7 +56,7 @@
     <Compile Include="FileFormats\PotResourceWriter.cs" />
     <Compile Include="FileFormats\TxtResourceReader.cs" />
     <Compile Include="FileFormats\TxtResourceWriter.cs" />
-    <Compile Include="monoresgen.cs" />
+    <Compile Include="Main.cs" />
     <Compile Include="Options.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ResourceInfo.cs" />

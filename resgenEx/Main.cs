@@ -31,33 +31,10 @@ namespace resgenEx
 
     class ResGen
     {
-
-
-        static Assembly swf;
-        static Type resxr;
-        static Type resxw;
-
         internal const string cProgramVersion = "v0.11";
         internal const string cProgramNameShort = "resgenEx";
         internal const string cProgramNameFull = "Extended Mono Resource Generator";
         internal const string cOriginalMessageComment_Prefix = "#. Original message text: ";
-
-        /*
-         * We load the ResX format stuff on demand, since the classes are in 
-         * System.Windows.Forms (!!!) and we can't depend on that assembly in mono, yet.
-         */
-        static void LoadResX()
-        {
-            if (swf != null)
-                return;
-            try {
-                swf = Assembly.Load(Consts.AssemblySystem_Windows_Forms);
-                resxr = swf.GetType("System.Resources.ResXResourceReader");
-                resxw = swf.GetType("System.Resources.ResXResourceWriter");
-            } catch (Exception e) {
-                throw new Exception("Cannot load support for ResX format: " + e.Message);
-            }
-        }
 
         static void Usage()
         {
@@ -116,9 +93,8 @@ Options:
                 case ".resources":
                     return new ResourceReader (stream);*/
                 case ".resx":
-                    LoadResX();
-                    IResourceReader reader = (IResourceReader)Activator.CreateInstance(
-                        resxr, new object[] { stream });
+                    IResourceReader reader = new ResXResourceReader(stream);
+
                     if (useSourcePath) { // only possible on 2.0 profile, or higher
                         PropertyInfo p = reader.GetType().GetProperty("BasePath",
                             BindingFlags.Public | BindingFlags.Instance);
@@ -155,8 +131,7 @@ Options:
                 case ".resources":
                     return new ResourceWriter (stream);*/
                 case ".resx":
-                    LoadResX();
-                    return (IResourceWriter)Activator.CreateInstance(resxw, new object[] { stream });
+                    return new ResXResourceWriter(stream);
                 default:
                     throw new Exception("Unknown format in file " + name);
             }

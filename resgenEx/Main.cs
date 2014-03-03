@@ -31,15 +31,29 @@ namespace resgenEx
 
     class ResGen
     {
-        internal const string cProgramVersion = "v0.11";
         internal const string cProgramNameShort = "resgenEx";
         internal const string cProgramNameFull = "Extended Mono Resource Generator";
         internal const string cOriginalMessageComment_Prefix = "#. Original message text: ";
 
+        internal static string ProgramVersion {
+            get {
+                Version assemblyVersion = Assembly.GetAssembly(typeof(ResGen)).GetName().Version;
+
+                string result = String.Format(
+                    "v{0}.{1}.{2}",
+                    assemblyVersion.Major,
+                    assemblyVersion.Minor,
+                    assemblyVersion.Build
+                );
+
+                return result;
+            }
+        }
+
         static void Usage()
         {
 
-            string Usage = cProgramNameFull + " " + cProgramVersion + //@"Mono Resource Generator version " + Consts.MonoVersion +
+            string Usage = cProgramNameFull + " " + ProgramVersion + //@"Mono Resource Generator version " + Consts.MonoVersion +
                 @"
 WARNING: this version has been specialized for use converting between '.resx'
 , '.po', and '.isl' files, other formats will now fail!

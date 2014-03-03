@@ -13,6 +13,8 @@ the msgstr, resgenEx adds an "#. Original message text: " comment when
 converting from other formats into .po. If you wish to add these comments
 to an existing .po file you can convert it to .resx then back to .po
 
+In future I may add WiX .wxl files.
+
 **The Windows executable can be [downloaded here](https://mega.co.nz/#!DZ9mGIhI!928EQfsXO8PAZ6PFbF6mkuVg8ZTgtawj7cAFgCURpu0)** (v0.11)
 
 #### Usage:

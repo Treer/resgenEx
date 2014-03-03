@@ -64,7 +64,7 @@ Usage:
 
 Convert a resource file from one format to another.
 The currently supported formats are: '.resx' '.po' '.pot' '.isl'.
-If the destination file is not specified, source.resources will be used.";
+If the destination file is not specified, source.resx will be used.";
 
             Usage += @"
 
@@ -334,12 +334,12 @@ Options:
                                 case 1:
                                     resInf.InputFile = Path.GetFullPath(pair[0]);
                                     resInf.OutputFile = Path.ChangeExtension(resInf.InputFile,
-                                        "resources");
+                                        "resx");
                                     break;
                                 case 2:
                                     if (pair[1].Length == 0) {
                                         Console.WriteLine(@"error: You must specify an input & outfile file name like this:");
-                                        Console.WriteLine("inFile.txt,outFile.resources.");
+                                        Console.WriteLine("inFile.po,outFile.resx.");
                                         Console.WriteLine("You passed in '{0}'.", args[i]);
                                         return 1;
                                     }
@@ -360,7 +360,7 @@ Options:
                             } else {
                                 resInf.InputFile = Path.GetFullPath(args[i]);
                                 resInf.OutputFile = Path.ChangeExtension(resInf.InputFile,
-                                    "resources");
+                                    "resx");
                             }
                         }
                         inputFiles.Add(resInf);

@@ -19,7 +19,7 @@ In future I may add WiX .wxl files.
 
 #### Usage:
 
-    resgen [options] source.ext [dest.ext]
+    resgenex [options] source.ext [dest.ext]
 
 Convert a resource file from one format to another.
 The currently supported formats are: '.resx' '.po' '.pot' '.isl'.
